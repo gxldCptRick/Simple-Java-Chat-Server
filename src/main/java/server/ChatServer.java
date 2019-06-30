@@ -1,6 +1,8 @@
 package server;
 
 import configuration.Configuration;
+import server.commands.ClientExitServerCommand;
+import server.commands.ServerCommand;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -20,11 +22,13 @@ public class ChatServer {
     private int port;
     private Map<String, SocketChannel> userToChannel;
     private Map<SocketChannel, String> channelToUser;
+    private ServerCommand[] commands;
 
     public ChatServer(int port){
         this.port = port;
         userToChannel = new HashMap<>();
         channelToUser = new HashMap<>();
+        commands = new ServerCommand[]{ new ClientExitServerCommand() };
     }
 
     public ChatServer(){
@@ -40,18 +44,9 @@ public class ChatServer {
                 selector.select();
                 Set<SelectionKey> keys = selector.selectedKeys();
                 Iterator<SelectionKey> iterator = keys.iterator();
-
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
-
-                    if (key.isAcceptable()) {
-                        registerNewClient();
-                    }
-
-                    if (key.isReadable()) {
-                        handleIncomingMessage(key);
-                    }
-
+                    processKey(key);
                     iterator.remove();
                 }
             }while (true);
@@ -60,19 +55,40 @@ public class ChatServer {
         }
     }
 
-    private void handleIncomingMessage(SelectionKey key) {
-        try (SocketChannel client = (SocketChannel) key.channel()) {
-            ByteBuffer requestBuffer = ByteBuffer.allocate(Configuration.BUFFER_SIZE);
-            client.read(requestBuffer);
-
-            String request = new String(requestBuffer.array()).trim();
-            String response = null;
-            System.out.println(request);
-
-        } catch(IOException e) {
-            System.out.println(e.getMessage());
-            e.printStackTrace();
+    private void processKey(SelectionKey key) {
+        if (key.isAcceptable()) {
+            registerNewClient();
         }
+        if (key.isReadable()) {
+            handleIncomingMessage(key);
+        }
+    }
+
+    private void handleIncomingMessage(SelectionKey key) {
+        try{
+            SocketChannel clientChannel = (SocketChannel) key.channel();
+            var message = readMessageFromSocketChannel(clientChannel);
+            if(message.startsWith("/")){
+                for (var command: commands) {
+                    if(command.isApplicable(message)){
+                        command.execute(this, channelToUser.get(clientChannel));
+                    }
+                }
+            }else{
+                if(!message.contains(":")){
+                    writeErrorMessageToSocketChannel("request must be a command or be <username>: <message> format.", clientChannel);
+                    logError("client sent invalid request: " + message);
+
+                }
+            }
+        }catch (IOException e){
+            logError("Could not process the client request.");
+        }
+
+    }
+
+    private void writeErrorMessageToSocketChannel(String message, SocketChannel clientChannel) throws IOException {
+        writeMessageToSocketChannel("Error: " + message, clientChannel);
     }
 
     private void logMessage(String message){
@@ -126,7 +142,7 @@ public class ChatServer {
         server.bind(new InetSocketAddress("localhost", port));
         server.configureBlocking(false);
         server.register(selector, SelectionKey.OP_ACCEPT);
-        System.out.println("Bound to port: " + Configuration.BIND_PORT);
+        logMessage("Bound to port: " + port);
     }
 
     public void closeClient(String user) throws IOException {
