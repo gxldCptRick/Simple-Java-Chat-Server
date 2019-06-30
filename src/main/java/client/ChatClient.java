@@ -1,15 +1,16 @@
 package client;
 
-import java.io.*;
-import java.net.Socket;
-
 import client.commands.ClientCommand;
 import client.commands.ClientExitCommand;
 import client.commands.ClientListClientsCommand;
-
 import configuration.Configuration;
 
-public class ChatClient implements  AutoCloseable{
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+
+public class ChatClient implements AutoCloseable {
     private boolean connectedToServer = false;
     private InputStream serverInStream;
     private OutputStream serverOutStream;
@@ -18,12 +19,12 @@ public class ChatClient implements  AutoCloseable{
     private String host;
     private ClientCommand[] commands;
 
-    public ChatClient(String[] args){
+    public ChatClient(String[] args) {
         parseHostAndPort(args);
-        commands = new ClientCommand[]{ new ClientExitCommand(), new ClientListClientsCommand() };
+        commands = new ClientCommand[]{new ClientExitCommand(), new ClientListClientsCommand()};
     }
 
-    public boolean isConnectedToServer(){
+    public boolean isConnectedToServer() {
         return this.connectedToServer;
     }
 
@@ -31,11 +32,11 @@ public class ChatClient implements  AutoCloseable{
         return serverInStream.available() > 0;
     }
 
-    public void listUsers() throws IOException{
+    public void listUsers() throws IOException {
         writeMessageToChatServer("/list-users");
     }
 
-    private void parseHostAndPort(String[] args){
+    private void parseHostAndPort(String[] args) {
         this.port = Configuration.BIND_PORT;
         if (args.length == 2) {
             this.port = parsePort(args[1]);
@@ -61,47 +62,48 @@ public class ChatClient implements  AutoCloseable{
     }
 
     public String readResponseFromServer() throws IOException {
-        if(!connectedToServer) throw new IllegalStateException("Connection to server is not established");
-        if(serverInStream.available() == 0) throw new IllegalStateException("Tried to read a message before there it was ready.");
+        if (!connectedToServer) throw new IllegalStateException("Connection to server is not established");
+        if (serverInStream.available() == 0)
+            throw new IllegalStateException("Tried to read a message before there it was ready.");
         var buffer = new byte[Configuration.BUFFER_SIZE];
         var charactersRead = serverInStream.read(buffer);
-        if(charactersRead < buffer.length) throw new RuntimeException("Server did not respond correctly");
+        if (charactersRead < buffer.length) throw new RuntimeException("Server did not respond correctly");
         return new String(buffer).trim();
     }
 
     public void writeToChatServer(String message) throws IOException {
-        if(message.startsWith("/")){
-            for (var command: commands) {
-                if(command.isApplicable(message)){
+        if (message.startsWith("/")) {
+            for (var command : commands) {
+                if (command.isApplicable(message)) {
                     command.execute(this);
+                    return;
                 }
             }
         }
-        else {
-            writeMessageToChatServer(message);
-        }
+        writeMessageToChatServer(message);
     }
 
-    private void writeMessageToChatServer(String message) throws IOException{
-        if(message.length() > Configuration.BUFFER_SIZE) throw new IllegalArgumentException("message is too long for buffer");
-        if(!isConnectedToServer()){
+    public void writeMessageToChatServer(String message) throws IOException {
+        if (message.length() > Configuration.BUFFER_SIZE)
+            throw new IllegalArgumentException("message is too long for buffer");
+        if (!isConnectedToServer()) {
             throw new IllegalStateException("Tried to write to a server when no connection was established.");
         }
-        var request = String.format("%-"+ Configuration.BUFFER_SIZE + "s", message);
+        var request = String.format("%-" + Configuration.BUFFER_SIZE + "s", message);
         serverOutStream.write(request.getBytes());
     }
 
     private void connectToServer(String host, int port) throws IOException {
-            this.serverConnection = new Socket(host, port);
-            System.out.println("Connected to server!\nHost: '" + host + "\nPort: '" + port + "'\n\n");
-            connectedToServer = true;
-            this.serverInStream = serverConnection.getInputStream();
-            this.serverOutStream = serverConnection.getOutputStream();
+        this.serverConnection = new Socket(host, port);
+        System.out.println("Connected to server!\nHost: '" + host + "\nPort: '" + port + "'\n\n");
+        connectedToServer = true;
+        this.serverInStream = serverConnection.getInputStream();
+        this.serverOutStream = serverConnection.getOutputStream();
     }
 
     @Override
     public void close() throws IOException {
-        if(serverConnection != null){
+        if (serverConnection != null) {
             connectedToServer = false;
             writeMessageToChatServer("/exit");
             serverConnection.close();

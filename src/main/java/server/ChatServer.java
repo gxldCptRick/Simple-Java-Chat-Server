@@ -3,11 +3,12 @@ package server;
 import configuration.Configuration;
 import configuration.MessageTypes;
 import server.commands.ClientExitServerCommand;
+import server.commands.ListClientsServerCommand;
 import server.commands.ServerCommand;
+import server.commands.SmileServerCommand;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -30,7 +31,10 @@ public class ChatServer {
         this.port = port;
         userToChannel = new HashMap<>();
         channelToUser = new HashMap<>();
-        commands = new ServerCommand[]{ new ClientExitServerCommand() };
+        commands = new ServerCommand[]{
+                new ClientExitServerCommand(),
+                new ListClientsServerCommand(),
+                new SmileServerCommand()};
     }
 
     public ChatServer(){
@@ -41,7 +45,6 @@ public class ChatServer {
         try {
             selector = Selector.open();
             bindAndListenToPort();
-            System.out.println("Server running...");
             do{
                 selector.select();
                 Set<SelectionKey> keys = selector.selectedKeys();
@@ -74,8 +77,10 @@ public class ChatServer {
                 for (var command: commands) {
                     if(command.isApplicable(message)){
                         command.execute(this, channelToUser.get(clientChannel));
+                        return;
                     }
                 }
+                writeErrorMessageToSocketChannel("Command not found: " + message, clientChannel);
             }else{
                 processMessageRequest(message, clientChannel);
             }
@@ -133,8 +138,6 @@ public class ChatServer {
         try {
             SocketChannel client = server.accept();
             logMessage("New client connection received");
-            client.configureBlocking(false);
-            client.register(selector, SelectionKey.OP_READ);
             writeMessageToSocketChannel(Configuration.WELCOME_MESSAGE, client);
             var clientName = readMessageFromSocketChannel(client);
             if(userToChannel.containsKey(clientName)){
@@ -146,6 +149,8 @@ public class ChatServer {
                 userToChannel.put(clientName, client);
                 channelToUser.put(client, clientName);
                 logMessage(clientName + " has connected");
+                client.configureBlocking(false);
+                client.register(selector, SelectionKey.OP_READ);
             }
         } catch(IOException e) {
             System.out.println(e.getMessage());
@@ -183,6 +188,24 @@ public class ChatServer {
             if(!user.equalsIgnoreCase(client)){
                 writeMessageToSocketChannel(broadcastMessage, userToChannel.get(user));
             }
+        }
+    }
+
+    public String collectUserString(String user) {
+        return userToChannel.keySet()
+                .stream()
+                .filter(u -> !u.equalsIgnoreCase(user))
+                .reduce("", (agg,next) -> agg + ", " + next);
+    }
+
+    public void writeMessageToUser(String user, String message) {
+        try{
+            var clientChannel = userToChannel.get(user);
+            writeMessageToSocketChannel(message, clientChannel);
+            logMessage("Sent message to " + user + ": " + message);
+        }
+        catch(IOException e) {
+            logError("error when trying to send message to user");
         }
     }
 }
