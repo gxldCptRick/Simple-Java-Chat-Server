@@ -1,5 +1,7 @@
 package client;
 
+import configuration.MessageTypes;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -10,21 +12,28 @@ public class ClientApp {
     public ClientApp(){
         userInput = new BufferedReader(new InputStreamReader(System.in));
     }
-    public  void run(String[] args) {
-        if (args.length < 1 || args.length > 2) {
-            System.err.println("Inavlid number of arguemnts!!");
-            System.err.println("Expected 1 or 2, got " + args.length);
-            return;
-        }
+    public void run(String[] args) {
+        validateArgs(args);
         try(var client = new ChatClient(args)){
             initialHandShake(client);
             while(client.isConnectedToServer()){
                 if(client.hasResponse()){
-                    System.out.println(client.readResponseFromServer());
+                    var response = client.readResponseFromServer();
+                    if(response.startsWith(MessageTypes.ERROR_HEADER)){
+                        System.err.println(response);
+                    }else{
+                        System.out.println(response);
+                    }
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void validateArgs(String[] args) {
+        if (args.length < 1 || args.length > 2) {
+            throw new IllegalArgumentException("Invalid number of arguments!!\nExpected 1 or 2, and got " + args.length);
         }
     }
 

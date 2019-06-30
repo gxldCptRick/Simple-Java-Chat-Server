@@ -1,6 +1,7 @@
 package server;
 
 import configuration.Configuration;
+import configuration.MessageTypes;
 import server.commands.ClientExitServerCommand;
 import server.commands.ServerCommand;
 
@@ -104,7 +105,7 @@ public class ChatServer {
     }
 
     private void writeErrorMessageToSocketChannel(String message, SocketChannel clientChannel) throws IOException {
-        writeMessageToSocketChannel("Error: " + message, clientChannel);
+        writeMessageToSocketChannel(MessageTypes.ERROR_HEADER + message, clientChannel);
     }
 
     private void logMessage(String message){
