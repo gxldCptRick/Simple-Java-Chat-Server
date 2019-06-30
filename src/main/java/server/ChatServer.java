@@ -9,12 +9,27 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 
 public class ChatServer {
     private Selector selector = null;
     private ServerSocketChannel server = null;
+    private int port;
+    private Map<String, SocketChannel> userToChannel;
+    private Map<SocketChannel, String> channelToUser;
+
+    public ChatServer(int port){
+        this.port = port;
+        userToChannel = new HashMap<>();
+        channelToUser = new HashMap<>();
+    }
+
+    public ChatServer(){
+        this(Configuration.BIND_PORT);
+    }
 
     public void run() {
         try {
@@ -60,25 +75,53 @@ public class ChatServer {
         }
     }
 
+    private void logMessage(String message){
+        System.out.println("!! " + message +  " !!");
+    }
+
+    private void logError(String errorMessage){
+        System.err.println("## " +errorMessage +  " ##");
+    }
+
+
+    private void writeMessageToSocketChannel(String message, SocketChannel channel) throws IOException {
+        String msg = String.format("%-" + Configuration.BUFFER_SIZE + "s", message);
+        channel.write(ByteBuffer.wrap(msg.getBytes()));
+    }
+
+
+    private String readMessageFromSocketChannel(SocketChannel client) throws IOException {
+        var readBuffer = ByteBuffer.allocate(Configuration.BUFFER_SIZE);
+        client.read(readBuffer);
+        return new String(readBuffer.array()).trim();
+    }
+
     private void registerNewClient() {
         try {
             SocketChannel client = server.accept();
-            System.out.println("New Client connected! " + client.toString());
+            logMessage("New client connection received");
             client.configureBlocking(false);
             client.register(selector, SelectionKey.OP_READ);
-            String msg = String.format("%" + Configuration.BUFFER_SIZE + "s", Configuration.WELCOME_MESSAGE);
-            client.write(ByteBuffer.wrap(msg.getBytes()));
-            // client.close();
-            
+            writeMessageToSocketChannel(Configuration.WELCOME_MESSAGE, client);
+            var clientName = readMessageFromSocketChannel(client);
+            if(userToChannel.containsKey(clientName)){
+                writeMessageToSocketChannel("User already connected with that name. please reconnect with new name.", client);
+                client.close();
+            }else{
+                userToChannel.put(clientName, client);
+                channelToUser.put(client, clientName);
+            }
+            logMessage(clientName + " has connected");
         } catch(IOException e) {
             System.out.println(e.getMessage());
             e.printStackTrace();
+            logError("Something went wrong with the initial connection with the client.");
         }
     }
 
     private void bindAndListenToPort() throws IOException {
         server = ServerSocketChannel.open();
-        server.bind(new InetSocketAddress("localhost", Configuration.BIND_PORT));
+        server.bind(new InetSocketAddress("localhost", port));
         server.configureBlocking(false);
         server.register(selector, SelectionKey.OP_ACCEPT);
         System.out.println("Bound to port: " + Configuration.BIND_PORT);
