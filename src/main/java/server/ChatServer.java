@@ -6,6 +6,7 @@ import server.commands.ServerCommand;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -75,16 +76,31 @@ public class ChatServer {
                     }
                 }
             }else{
-                if(!message.contains(":")){
-                    writeErrorMessageToSocketChannel("request must be a command or be <username>: <message> format.", clientChannel);
-                    logError("client sent invalid request: " + message);
-
-                }
+                processMessageRequest(message, clientChannel);
             }
         }catch (IOException e){
             logError("Could not process the client request.");
         }
 
+    }
+
+    private void processMessageRequest(String message, SocketChannel clientChannel) throws IOException {
+        if(!message.contains(":")){
+            writeErrorMessageToSocketChannel("request must be a command or be <username>: <message> format.", clientChannel);
+            logError("client sent invalid request: " + message);
+        }else{
+           var requestParts  = message.split(":");
+           var requestedUser = requestParts[0].trim();
+           var sender = channelToUser.get(clientChannel);
+            if(userToChannel.containsKey(requestedUser)){
+               var messageToSend = sender+":" + requestParts[1].trim();
+               writeMessageToSocketChannel(messageToSend, userToChannel.get(requestedUser));
+               logMessage(String.format("%s sent %s to %s", sender, messageToSend, requestedUser));
+           }else{
+               writeErrorMessageToSocketChannel("no user by the name " + requestedUser + " exists", clientChannel);
+               logMessage( sender + " requested a user that did not exist: " + requestedUser);
+           }
+        }
     }
 
     private void writeErrorMessageToSocketChannel(String message, SocketChannel clientChannel) throws IOException {
@@ -121,7 +137,7 @@ public class ChatServer {
             writeMessageToSocketChannel(Configuration.WELCOME_MESSAGE, client);
             var clientName = readMessageFromSocketChannel(client);
             if(userToChannel.containsKey(clientName)){
-                writeMessageToSocketChannel("User already connected with that name. please reconnect with new name.", client);
+                writeErrorMessageToSocketChannel("User already connected with that name. please reconnect with new name.", client);
                 logError("Client tried to connect with a username that was taken");
                 client.close();
             }else{
