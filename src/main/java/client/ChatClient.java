@@ -2,12 +2,11 @@ package client;
 
 import java.io.*;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 
 import client.commands.ClientCommand;
 import client.commands.ClientExitCommand;
 import client.commands.ClientListClientsCommand;
-import configuration.Commands;
+
 import configuration.Configuration;
 
 public class ChatClient implements  AutoCloseable{

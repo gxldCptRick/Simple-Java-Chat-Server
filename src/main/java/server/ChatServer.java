@@ -128,4 +128,28 @@ public class ChatServer {
         server.register(selector, SelectionKey.OP_ACCEPT);
         System.out.println("Bound to port: " + Configuration.BIND_PORT);
     }
+
+    public void closeClient(String user) throws IOException {
+        var channel = userToChannel.get(user);
+        try{
+            logMessage("Broadcasting exit to all clients");
+            broadcastMessageToAllClients(user, user + " is leaving :'(");
+        }catch(IOException e){
+            e.printStackTrace();
+            logError("Broadcasting to all the clients failed.");
+        }
+        userToChannel.remove(user, channel);
+        channelToUser.remove(channel, user);
+        logMessage("Removed "+  user+ " from our memory.");
+        channel.close();
+        logMessage("Closed socket for "+ user);
+    }
+
+    public void broadcastMessageToAllClients(String client, String broadcastMessage) throws IOException {
+        for (var user : userToChannel.keySet()) {
+            if(!user.equalsIgnoreCase(client)){
+                writeMessageToSocketChannel(broadcastMessage, userToChannel.get(user));
+            }
+        }
+    }
 }
