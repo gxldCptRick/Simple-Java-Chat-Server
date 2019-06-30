@@ -106,12 +106,14 @@ public class ChatServer {
             var clientName = readMessageFromSocketChannel(client);
             if(userToChannel.containsKey(clientName)){
                 writeMessageToSocketChannel("User already connected with that name. please reconnect with new name.", client);
+                logError("Client tried to connect with a username that was taken");
                 client.close();
             }else{
+                writeMessageToSocketChannel("Welcome " + clientName, client);
                 userToChannel.put(clientName, client);
                 channelToUser.put(client, clientName);
+                logMessage(clientName + " has connected");
             }
-            logMessage(clientName + " has connected");
         } catch(IOException e) {
             System.out.println(e.getMessage());
             e.printStackTrace();
