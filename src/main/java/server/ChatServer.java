@@ -21,7 +21,7 @@ public class ChatServer {
             selector = Selector.open();
             bindAndListenToPort();
             System.out.println("Server running...");
-            while (true){
+            do{
                 selector.select();
                 Set<SelectionKey> keys = selector.selectedKeys();
                 Iterator<SelectionKey> iterator = keys.iterator();
@@ -39,7 +39,7 @@ public class ChatServer {
 
                     iterator.remove();
                 }
-            }
+            }while (true);
         } catch (IOException e) {
             e.printStackTrace();
         }
