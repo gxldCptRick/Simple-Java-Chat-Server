@@ -16,6 +16,28 @@ public class ClientApp {
         validateArgs(args);
         try(var client = new ChatClient(args)){
             initialHandShake(client);
+
+            var inputThread = new Thread(() -> {
+                var br = new BufferedReader(new InputStreamReader(System.in));
+                String input;
+
+                try {
+                    while((input = br.readLine()) != null && client.isConnectedToServer()){
+                        if (input.isBlank()){
+                            System.out.println("Message cannot be blank or whitespace!");
+                            continue;
+                        }
+
+                        client.writeMessageToChatServer(input);
+                    }
+                } catch(IOException e) {
+                    System.out.println(e.getMessage());
+                    e.printStackTrace();
+                }
+                
+            });
+
+            inputThread.start();
             while(client.isConnectedToServer()){
                 if(client.hasResponse()){
                     var response = client.readResponseFromServer();

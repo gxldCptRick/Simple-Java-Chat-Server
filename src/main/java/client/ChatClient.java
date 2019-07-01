@@ -11,7 +11,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 public class ChatClient implements AutoCloseable {
-    private boolean connectedToServer = false;
+    private volatile boolean connectedToServer = false;
     private InputStream serverInStream;
     private OutputStream serverOutStream;
     private Socket serverConnection;
@@ -63,8 +63,8 @@ public class ChatClient implements AutoCloseable {
 
     public String readResponseFromServer() throws IOException {
         if (!connectedToServer) throw new IllegalStateException("Connection to server is not established");
-        if (serverInStream.available() == 0)
-            throw new IllegalStateException("Tried to read a message before there it was ready.");
+        // if (serverInStream.available() == 0)
+        //     throw new IllegalStateException("Tried to read a message before there it was ready.");
         var buffer = new byte[Configuration.BUFFER_SIZE];
         var charactersRead = serverInStream.read(buffer);
         if (charactersRead < buffer.length) throw new RuntimeException("Server did not respond correctly");
