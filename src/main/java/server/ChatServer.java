@@ -27,6 +27,7 @@ public class ChatServer {
     private Map<SocketChannel, String> channelToUser;
     private ServerCommand[] commands;
 
+    private String bindingIP = "0.0.0.0";
     public ChatServer(int port){
         this.port = port;
         userToChannel = new HashMap<>();
@@ -200,7 +201,7 @@ public class ChatServer {
 
     private void bindAndListenToPort() throws IOException {
         server = ServerSocketChannel.open();
-        server.bind(new InetSocketAddress("localhost", port));
+        server.bind(new InetSocketAddress(bindingIP, port));
         server.configureBlocking(false);
         server.register(selector, SelectionKey.OP_ACCEPT);
         logMessage("Bound to port: " + port);
