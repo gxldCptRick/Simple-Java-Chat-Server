@@ -73,6 +73,7 @@ public class ChatServer {
         try{
             SocketChannel clientChannel = (SocketChannel) key.channel();
             var message = readMessageFromSocketChannel(clientChannel);
+            logMessage("Received: "+ message);
             if(message.startsWith("/")){
                 for (var command: commands) {
                     if(command.isApplicable(message)){
@@ -86,15 +87,32 @@ public class ChatServer {
             }
         }catch (IOException e){
             logError("Could not process the client request.");
+            var username = channelToUser.get(key.channel());
+            userToChannel.remove(username);
+            channelToUser.remove(key.channel());
+            try {
+                key.channel().close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
         }
 
     }
 
     private void processMessageRequest(String message, SocketChannel clientChannel) throws IOException {
-        if(!message.contains(":")){
-            writeErrorMessageToSocketChannel("request must be a command or be <username>: <message> format.", clientChannel);
-            logError("client sent invalid request: " + message);
-        }else{
+        if(!message.contains(":") && !channelToUser.containsKey(clientChannel)){
+            var clientName = message;
+            if(userToChannel.containsKey(clientName)){
+                writeErrorMessageToSocketChannel("User already connected with that name. please reconnect with new name.", clientChannel);
+                logError("Client tried to connect with a username that was taken");
+                clientChannel.close();
+            }else{
+                writeMessageToSocketChannel("Welcome " + clientName, clientChannel);
+                userToChannel.put(clientName, clientChannel);
+                channelToUser.put(clientChannel, clientName);
+                logMessage(clientName + " has connected");
+            }
+        }else if(message.contains(":")){
            var requestParts  = message.split(":");
            var requestedUser = requestParts[0].trim();
            var sender = channelToUser.get(clientChannel);
@@ -106,6 +124,9 @@ public class ChatServer {
                writeErrorMessageToSocketChannel("no user by the name " + requestedUser + " exists", clientChannel);
                logMessage( sender + " requested a user that did not exist: " + requestedUser);
            }
+        } else{
+            writeErrorMessageToSocketChannel("that was not a valid request", clientChannel);
+            logError("client sent bad request: " + message);
         }
     }
 
@@ -124,7 +145,9 @@ public class ChatServer {
 
     private void writeMessageToSocketChannel(String message, SocketChannel channel) throws IOException {
         String msg = String.format("%-" + Configuration.BUFFER_SIZE + "s", message);
-        channel.write(ByteBuffer.wrap(msg.getBytes()));
+        var buffer = ByteBuffer.wrap(msg.getBytes());
+        while(channel.write(buffer) > 0);
+
     }
 
 
@@ -137,21 +160,10 @@ public class ChatServer {
     private void registerNewClient() {
         try {
             SocketChannel client = server.accept();
+            client.configureBlocking(false);
+            client.register(selector, SelectionKey.OP_READ);
             logMessage("New client connection received");
             writeMessageToSocketChannel(Configuration.WELCOME_MESSAGE, client);
-            var clientName = readMessageFromSocketChannel(client);
-            if(userToChannel.containsKey(clientName)){
-                writeErrorMessageToSocketChannel("User already connected with that name. please reconnect with new name.", client);
-                logError("Client tried to connect with a username that was taken");
-                client.close();
-            }else{
-                writeMessageToSocketChannel("Welcome " + clientName, client);
-                userToChannel.put(clientName, client);
-                channelToUser.put(client, clientName);
-                logMessage(clientName + " has connected");
-                client.configureBlocking(false);
-                client.register(selector, SelectionKey.OP_READ);
-            }
         } catch(IOException e) {
             System.out.println(e.getMessage());
             e.printStackTrace();

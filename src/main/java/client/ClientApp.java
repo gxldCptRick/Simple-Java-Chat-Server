@@ -16,6 +16,17 @@ public class ClientApp {
         validateArgs(args);
         try(var client = new ChatClient(args)){
             initialHandShake(client);
+            var t = new Thread(() -> {
+                while(client.isConnectedToServer()){
+                    try {
+                        client.writeToChatServer(userInput.readLine());
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        System.err.println("Error getting input from user");
+                    }
+                }
+            });
+            t.start();
             while(client.isConnectedToServer()){
                 if(client.hasResponse()){
                     var response = client.readResponseFromServer();
@@ -26,8 +37,12 @@ public class ClientApp {
                     }
                 }
             }
+            t.join(1000);
         } catch (IOException e) {
             e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.err.println("Something went wrong!!");
         }
     }
 
