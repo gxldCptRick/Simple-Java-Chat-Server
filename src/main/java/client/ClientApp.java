@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 
 public class ClientApp {
     private BufferedReader userInput;
-    private String username;
     public ClientApp(){
         userInput = new BufferedReader(new InputStreamReader(System.in));
     }
@@ -16,7 +15,7 @@ public class ClientApp {
         validateArgs(args);
         try(var client = new ChatClient(args)){
             initialHandShake(client);
-            var t = new Thread(() -> {
+            var inputThread = new Thread(() -> {
                 while(client.isConnectedToServer()){
                     try {
                         client.writeToChatServer(userInput.readLine());
@@ -26,7 +25,8 @@ public class ClientApp {
                     }
                 }
             });
-            t.start();
+            inputThread.start();
+
             while(client.isConnectedToServer()){
                 if(client.hasResponse()){
                     var response = client.readResponseFromServer();
@@ -37,7 +37,7 @@ public class ClientApp {
                     }
                 }
             }
-            t.join(1000);
+            inputThread.join(1000);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (InterruptedException e) {
@@ -57,6 +57,5 @@ public class ClientApp {
         System.out.println(client.readResponseFromServer());
         var input = userInput.readLine();
         client.writeToChatServer(input);
-        username = input;
     }
 }

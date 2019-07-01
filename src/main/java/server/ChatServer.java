@@ -70,33 +70,63 @@ public class ChatServer {
     }
 
     private void handleIncomingMessage(SelectionKey key) {
-        try{
+        try {
             SocketChannel clientChannel = (SocketChannel) key.channel();
+            if (!channelToUser.containsKey(key.channel())) {
+                registerClientByName(clientChannel);
+                return;
+            }
             var message = readMessageFromSocketChannel(clientChannel);
-            logMessage("Received: "+ message);
-            if(message.startsWith("/")){
-                for (var command: commands) {
-                    if(command.isApplicable(message)){
+            if (message.startsWith("/")) {
+                for (var command : commands) {
+                    if (command.isApplicable(message)) {
                         command.execute(this, channelToUser.get(clientChannel));
                         return;
                     }
                 }
                 writeErrorMessageToSocketChannel("Command not found: " + message, clientChannel);
-            }else{
+            } else {
                 processMessageRequest(message, clientChannel);
             }
-        }catch (IOException e){
+        } catch (IOException e) {
             logError("Could not process the client request.");
-            var username = channelToUser.get(key.channel());
-            userToChannel.remove(username);
-            channelToUser.remove(key.channel());
+            e.printStackTrace();
+
             try {
-                key.channel().close();
-            } catch (IOException e1) {
+                closeClient(channelToUser.get((SocketChannel) key.channel()));
+            }
+            catch (IOException e1) {
+                logError("Faild to close client");
                 e1.printStackTrace();
             }
         }
 
+    }
+
+    private void registerClientByName(SocketChannel channel) {
+        logMessage("Registering client by name");
+        try {
+            var name = readMessageFromSocketChannel(channel);
+            if (name.isBlank()) {
+                writeMessageToSocketChannel("Invalid name! Try again!", channel);
+            }
+            else if (userToChannel.containsKey(name)) {
+                writeErrorMessageToSocketChannel("User already connected with that name. please reconnect with new name.", channel);
+                logError("Client tried to connect with a username that was taken");
+                channel.close();
+            }
+            else {
+                writeMessageToSocketChannel("Welcome to the server, " + name, channel);
+                writeMessageToSocketChannel("You can now send messages to other users that are online", channel);
+                logMessage("Regestered " + name);
+                userToChannel.put(name, channel);
+                channelToUser.put(channel, name);
+            }
+
+        } catch (IOException e) {
+            logError(e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     private void processMessageRequest(String message, SocketChannel clientChannel) throws IOException {
@@ -134,14 +164,13 @@ public class ChatServer {
         writeMessageToSocketChannel(MessageTypes.ERROR_HEADER + message, clientChannel);
     }
 
-    private void logMessage(String message){
-        System.out.println("!! " + message +  " !!");
+    private void logMessage(String message) {
+        System.out.println("!! " + message + " !!");
     }
 
-    private void logError(String errorMessage){
-        System.err.println("## " +errorMessage +  " ##");
+    private void logError(String errorMessage) {
+        System.err.println("## " + errorMessage + " ##");
     }
-
 
     private void writeMessageToSocketChannel(String message, SocketChannel channel) throws IOException {
         String msg = String.format("%-" + Configuration.BUFFER_SIZE + "s", message);
@@ -149,7 +178,6 @@ public class ChatServer {
         while(channel.write(buffer) > 0);
 
     }
-
 
     private String readMessageFromSocketChannel(SocketChannel client) throws IOException {
         var readBuffer = ByteBuffer.allocate(Configuration.BUFFER_SIZE);
@@ -181,42 +209,39 @@ public class ChatServer {
 
     public void closeClient(String user) throws IOException {
         var channel = userToChannel.get(user);
-        try{
+        try {
             logMessage("Broadcasting exit to all clients");
             broadcastMessageToAllClients(user, user + " is leaving :'(");
-        }catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
             logError("Broadcasting to all the clients failed.");
         }
         userToChannel.remove(user, channel);
         channelToUser.remove(channel, user);
-        logMessage("Removed "+  user+ " from our memory.");
+        logMessage("Removed " + user + " from our memory.");
         channel.close();
-        logMessage("Closed socket for "+ user);
+        logMessage("Closed socket for " + user);
     }
 
     public void broadcastMessageToAllClients(String client, String broadcastMessage) throws IOException {
         for (var user : userToChannel.keySet()) {
-            if(!user.equalsIgnoreCase(client)){
+            if (!user.equalsIgnoreCase(client)) {
                 writeMessageToSocketChannel(broadcastMessage, userToChannel.get(user));
             }
         }
     }
 
     public String collectUserString(String user) {
-        return userToChannel.keySet()
-                .stream()
-                .filter(u -> !u.equalsIgnoreCase(user))
-                .reduce("", (agg,next) -> agg + ", " + next);
+        return userToChannel.keySet().stream().filter(u -> !u.equalsIgnoreCase(user)).reduce("",
+                (agg, next) -> agg + ", " + next);
     }
 
     public void writeMessageToUser(String user, String message) {
-        try{
+        try {
             var clientChannel = userToChannel.get(user);
             writeMessageToSocketChannel(message, clientChannel);
             logMessage("Sent message to " + user + ": " + message);
-        }
-        catch(IOException e) {
+        } catch (IOException e) {
             logError("error when trying to send message to user");
         }
     }
