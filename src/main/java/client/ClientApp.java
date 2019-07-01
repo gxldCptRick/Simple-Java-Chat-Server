@@ -8,17 +8,19 @@ import java.io.InputStreamReader;
 
 public class ClientApp {
     private BufferedReader userInput;
-    public ClientApp(){
+
+    public ClientApp() {
         userInput = new BufferedReader(new InputStreamReader(System.in));
     }
+
     public void run(String[] args) {
         validateArgs(args);
-        try(var client = new ChatClient(args)){
+        try (var client = new ChatClient(args)) {
             initialHandShake(client);
             var inputThread = new Thread(() -> {
-                while(client.isConnectedToServer()){
+                while (client.isConnectedToServer()) {
                     try {
-                        client.writeToChatServer(userInput.readLine());
+                        client.writeMessageToChatServer(userInput.readLine());
                     } catch (IOException e) {
                         e.printStackTrace();
                         System.err.println("Error getting input from user");
@@ -27,14 +29,12 @@ public class ClientApp {
             });
             inputThread.start();
 
-            while(client.isConnectedToServer()){
-                if(client.hasResponse()){
-                    var response = client.readResponseFromServer();
-                    if(response.startsWith(MessageTypes.ERROR_HEADER)){
-                        System.err.println(response);
-                    }else{
-                        System.out.println(response);
-                    }
+            while (client.isConnectedToServer()) {
+                var response = client.readResponseFromServer();
+                if (response.startsWith(MessageTypes.ERROR_HEADER)) {
+                    System.err.println(response);
+                } else {
+                    System.out.println(response);
                 }
             }
             inputThread.join(1000);
@@ -56,6 +56,6 @@ public class ClientApp {
         client.run();
         System.out.println(client.readResponseFromServer());
         var input = userInput.readLine();
-        client.writeToChatServer(input);
+        client.writeMessageToChatServer(input);
     }
 }

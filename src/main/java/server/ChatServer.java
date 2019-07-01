@@ -72,10 +72,6 @@ public class ChatServer {
     private void handleIncomingMessage(SelectionKey key) {
         try {
             SocketChannel clientChannel = (SocketChannel) key.channel();
-            if (!channelToUser.containsKey(key.channel())) {
-                registerClientByName(clientChannel);
-                return;
-            }
             var message = readMessageFromSocketChannel(clientChannel);
             if (message.startsWith("/")) {
                 for (var command : commands) {
@@ -90,13 +86,16 @@ public class ChatServer {
             }
         } catch (IOException e) {
             logError("Could not process the client request.");
-            e.printStackTrace();
-
             try {
-                closeClient(channelToUser.get((SocketChannel) key.channel()));
+
+                if(channelToUser.containsKey(key.channel())){
+                    closeClient(channelToUser.get(key.channel()));
+                }else{
+                    key.channel().close();
+                }
             }
             catch (IOException e1) {
-                logError("Faild to close client");
+                logError("Failed to close client");
                 e1.printStackTrace();
             }
         }
@@ -209,18 +208,20 @@ public class ChatServer {
 
     public void closeClient(String user) throws IOException {
         var channel = userToChannel.get(user);
-        try {
-            logMessage("Broadcasting exit to all clients");
-            broadcastMessageToAllClients(user, user + " is leaving :'(");
-        } catch (IOException e) {
-            e.printStackTrace();
-            logError("Broadcasting to all the clients failed.");
+        if(channel != null){
+            try {
+                logMessage("Broadcasting exit to all clients");
+                broadcastMessageToAllClients(user, user + " is leaving :'(");
+            } catch (IOException e) {
+                e.printStackTrace();
+                logError("Broadcasting to all the clients failed.");
+            }
+            userToChannel.remove(user, channel);
+            channelToUser.remove(channel, user);
+            logMessage("Removed " + user + " from our memory.");
+            channel.close();
+            logMessage("Closed socket for " + user);
         }
-        userToChannel.remove(user, channel);
-        channelToUser.remove(channel, user);
-        logMessage("Removed " + user + " from our memory.");
-        channel.close();
-        logMessage("Closed socket for " + user);
     }
 
     public void broadcastMessageToAllClients(String client, String broadcastMessage) throws IOException {

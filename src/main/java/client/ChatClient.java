@@ -33,7 +33,7 @@ public class ChatClient implements AutoCloseable {
     }
 
     public void listUsers() throws IOException {
-        writeMessageToChatServer("/list-users");
+        writeStringToServer("/list-users");
     }
 
     private void parseHostAndPort(String[] args) {
@@ -63,27 +63,34 @@ public class ChatClient implements AutoCloseable {
 
     public String readResponseFromServer() throws IOException {
         if (!connectedToServer) throw new IllegalStateException("Connection to server is not established");
-        // if (serverInStream.available() == 0)
-        //     throw new IllegalStateException("Tried to read a message before there it was ready.");
         var buffer = new byte[Configuration.BUFFER_SIZE];
         var charactersRead = serverInStream.read(buffer);
         if (charactersRead < buffer.length) throw new RuntimeException("Server did not respond correctly");
         return new String(buffer).trim();
     }
 
-    public void writeToChatServer(String message) throws IOException {
-        if (message.startsWith("/")) {
-            for (var command : commands) {
-                if (command.isApplicable(message)) {
-                    command.execute(this);
-                    return;
+    public void writeMessageToChatServer(String message) {
+        try{
+            if (message.startsWith("/")) {
+                for (var command : commands) {
+                    if (command.isApplicable(message)) {
+                        command.execute(this);
+                        return;
+                    }
                 }
             }
+            writeStringToServer(message);
+        }catch(IOException e){
+            System.err.println("Lost Connection to server...");
+            try {
+                close();
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
         }
-        writeMessageToChatServer(message);
     }
 
-    public void writeMessageToChatServer(String message) throws IOException {
+    public void writeStringToServer(String message) throws IOException, IllegalStateException {
         if (message.length() > Configuration.BUFFER_SIZE)
             throw new IllegalArgumentException("message is too long for buffer");
         if (!isConnectedToServer()) {
@@ -104,8 +111,8 @@ public class ChatClient implements AutoCloseable {
     @Override
     public void close() throws IOException {
         if (serverConnection != null) {
+            writeStringToServer("/exit");
             connectedToServer = false;
-            writeMessageToChatServer("/exit");
             serverConnection.close();
         }
     }
