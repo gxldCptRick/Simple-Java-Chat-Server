@@ -20,7 +20,7 @@ public class ClientApp {
             var inputThread = new Thread(() -> {
                 while (client.isConnectedToServer()) {
                     try {
-                        client.writeMessageToChatServer(userInput.readLine());
+                        client.writeMessageToChatServer(getInputFromUser("Message"));
                     } catch (IOException e) {
                         e.printStackTrace();
                         System.err.println("Error getting input from user");
@@ -44,6 +44,11 @@ public class ClientApp {
             e.printStackTrace();
             System.err.println("Something went wrong!!");
         }
+    }
+
+    private String getInputFromUser(String message) throws IOException {
+        System.out.print(message+ ": ");
+        return userInput.readLine();
     }
 
     private void validateArgs(String[] args) {

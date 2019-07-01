@@ -97,7 +97,12 @@ public class ChatClient implements AutoCloseable {
             throw new IllegalStateException("Tried to write to a server when no connection was established.");
         }
         var request = String.format("%-" + Configuration.BUFFER_SIZE + "s", message);
-        serverOutStream.write(request.getBytes());
+        try{
+            serverOutStream.write(request.getBytes());
+        }catch(IOException e){
+            connectedToServer = false;
+            throw e;
+        }
     }
 
     private void connectToServer(String host, int port) throws IOException {
