@@ -2,10 +2,7 @@ package server;
 
 import configuration.Configuration;
 import configuration.MessageTypes;
-import server.commands.ClientExitServerCommand;
-import server.commands.ListClientsServerCommand;
-import server.commands.ServerCommand;
-import server.commands.SmileServerCommand;
+import server.commands.*;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -35,7 +32,9 @@ public class ChatServer {
         commands = new ServerCommand[]{
                 new ClientExitServerCommand(),
                 new ListClientsServerCommand(),
-                new SmileServerCommand()};
+                new SmileServerCommand(),
+                new KYSCommmand()
+        };
     }
 
     public ChatServer(){

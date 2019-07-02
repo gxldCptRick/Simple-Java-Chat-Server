@@ -15,12 +15,24 @@ public class ClientApp {
 
     public void run(String[] args) {
         validateArgs(args);
+        Thread inputThread = null;
         try (var client = new ChatClient(args)) {
             initialHandShake(client);
-            var inputThread = new Thread(() -> {
+            inputThread = new Thread(() -> {
+                var wroteMessage = false;
                 while (client.isConnectedToServer()) {
                     try {
-                        client.writeMessageToChatServer(getInputFromUser("Message"));
+                        if(!wroteMessage){
+                            System.out.print("Message: ");
+                        }
+                        wroteMessage = true;
+                        if(userInput.ready()){
+                            var message = userInput.readLine();
+                            if(!message.isBlank()){
+                                client.writeMessageToChatServer(message);
+                            }
+                            wroteMessage = false;
+                        }
                     } catch (IOException e) {
                         e.printStackTrace();
                         System.err.println("Error getting input from user");
@@ -39,16 +51,16 @@ public class ClientApp {
             }
             inputThread.join(1000);
         } catch (IOException e) {
-            e.printStackTrace();
+            if(inputThread != null){
+                try {
+                    inputThread.join(1000);
+                } catch (InterruptedException e1) {
+                    System.err.println("Something went wrong during cleanup of write thread!!");
+                }
+            }
         } catch (InterruptedException e) {
-            e.printStackTrace();
-            System.err.println("Something went wrong!!");
+            System.err.println("Something went wrong in cleanup of read thread!!");
         }
-    }
-
-    private String getInputFromUser(String message) throws IOException {
-        System.out.print(message+ ": ");
-        return userInput.readLine();
     }
 
     private void validateArgs(String[] args) {

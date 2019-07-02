@@ -116,8 +116,14 @@ public class ChatClient implements AutoCloseable {
     @Override
     public void close() throws IOException {
         if (serverConnection != null) {
-            writeStringToServer("/exit");
-            connectedToServer = false;
+            if(connectedToServer){
+                try{
+                    writeStringToServer("/exit");
+                }catch(IOException e){
+                    System.out.println(e.getMessage());
+                }
+                connectedToServer = false;
+            }
             serverConnection.close();
         }
     }
